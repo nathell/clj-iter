@@ -59,6 +59,10 @@ to result of calling TRANSFORM on the respective key/value pair."
     (update-map (update-map state :collect value) :collect-if condition)
     (:collect value)
     (update-map (update-map state :collect value) :collect-if 'true)
+    (:sum value :if condition)
+    (update-map state :sum `(if ~condition ~value 0))
+    (:sum value)
+    (update-map state :sum value)
     ()
     (update-map state :do (cons clause do))))
 
@@ -72,14 +76,22 @@ to result of calling TRANSFORM on the respective key/value pair."
                       (:colls parsed))
         collected (gensym "collected")
         loopvars (concat collvars (:vars parsed))]
-    `(loop [~@(if (:collect parsed) `(~collected nil) `())
+    `(loop [~@(cond
+                (:collect parsed) `(~collected nil)
+                (:sum parsed) `(~collected 0)
+                true `())
             ~@(reduce concat (map #(list (:var %) (:initially %)) loopvars))]
        (let [~@(reduce concat (map (fn [[k v]] (list k `(first ~v))) collvar-names))]
          (if (and ~@(remove not (map :stop loopvars)))
-           ~(if (:collect parsed) `(reverse ~collected) nil)
+           ~(cond
+              (:collect parsed) `(reverse ~collected)
+              (:sum parsed) collected)
            (do
              ~@(reverse (:do parsed))
-             (recur ~@(if (:collect parsed) `((if ~(:collect-if parsed) (cons ~(:collect parsed) ~collected) ~collected)) `())
+             (recur ~@(cond
+                        (:collect parsed) `((if ~(:collect-if parsed) (cons ~(:collect parsed) ~collected) ~collected))
+                        (:sum parsed) `((+ ~collected ~(:sum parsed)))
+                        true `())
                     ~@(map :then loopvars))))))))
 
 (deftest test-iter
@@ -108,4 +120,10 @@ to result of calling TRANSFORM on the respective key/value pair."
                (for y initially 1 then (+ x y))
                (collect x))
          (seq [0 1 1 2 3 5 8 13 21 34 55])))
+  (is (= (iter (for x from 0 to 10)
+               (sum x))
+         55))
+  (is (= (iter (for x from 0 to 10)
+               (sum x if (even? x)))
+         30))
   (is (nil? (iter (for x in [1 2 3]) (do)))))

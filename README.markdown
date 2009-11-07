@@ -62,6 +62,7 @@ Differences from Iterate
         FOR var ON sequence
         FOR var INITIALLY initial-expr THEN then-expr [STOP stop-condition]
         COLLECT expr [IF condition]
+        SUM expr [IF condition]
 
    The symbols that are treated specially by clj-iter are spelled
    here in uppercase to distinguish them visually, but they should

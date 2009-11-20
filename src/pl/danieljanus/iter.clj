@@ -89,7 +89,7 @@ to result of calling TRANSFORM on the respective key/value pair."
                 true `())
             ~@(reduce concat (map #(list (:var %) (:initially %)) loopvars))]
        (let [~@(reduce concat (map (fn [[k v]] (list k `(first ~v))) collvar-names))]
-         (if (and ~@(remove not (map :stop loopvars)))
+         (if (or ~@(remove not (map :stop loopvars)))
            ~(cond
               (:collect parsed) `(reverse ~collected)
               (:accum parsed) collected)
@@ -139,4 +139,8 @@ to result of calling TRANSFORM on the respective key/value pair."
   (is (= (iter (for x from 1 to 10)
                (multiply x if (even? x)))
          (* 2 4 6 8 10)))
+  (is (= (iter (for x from 1 to 5)
+               (for y in [1 2 3])
+               (collect [x y]))
+         (seq [[1 1] [2 2] [3 3]])))
   (is (nil? (iter (for x in [1 2 3]) (do)))))

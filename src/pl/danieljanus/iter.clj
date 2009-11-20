@@ -53,16 +53,23 @@ to result of calling TRANSFORM on the respective key/value pair."
     (update-map state :vars (cons {:var var, :initially from, :then `(dec ~var)} vars))
     (:for var :initially initially :then then :stop stop)
     (update-map state :vars (cons {:var var, :initially initially, :then then, :stop stop} vars))
-    (:for var :initially initially :then then )
+    (:for var :initially initially :then then)
     (update-map state :vars (cons {:var var, :initially initially, :then then} vars))
+    (:repeat times)
+    (let [v (gensym)]
+      (update-map state :vars (cons {:var v, :initially 0, :then `(inc ~v), :stop `(= ~v ~times)} vars)))
     (:collect value :if condition)
     (update-map (update-map state :collect value) :collect-if condition)
     (:collect value)
     (update-map (update-map state :collect value) :collect-if 'true)
     (:sum value :if condition)
-    (update-map state :sum `(if ~condition ~value 0))
+    (update-map state :accum [`(if ~condition ~value 0) '+ 0])
     (:sum value)
-    (update-map state :sum value)
+    (update-map state :accum [value '+ 0])
+    (:multiply value :if condition)
+    (update-map state :accum [`(if ~condition ~value 1) '* 1])
+    (:multiply value)
+    (update-map state :accum [value '* 1])
     ()
     (update-map state :do (cons clause do))))
 
@@ -78,19 +85,20 @@ to result of calling TRANSFORM on the respective key/value pair."
         loopvars (concat collvars (:vars parsed))]
     `(loop [~@(cond
                 (:collect parsed) `(~collected nil)
-                (:sum parsed) `(~collected 0)
+                (:accum parsed) `(~collected ~(nth (:accum parsed) 2))
                 true `())
             ~@(reduce concat (map #(list (:var %) (:initially %)) loopvars))]
        (let [~@(reduce concat (map (fn [[k v]] (list k `(first ~v))) collvar-names))]
          (if (and ~@(remove not (map :stop loopvars)))
            ~(cond
               (:collect parsed) `(reverse ~collected)
-              (:sum parsed) collected)
+              (:accum parsed) collected)
            (do
              ~@(reverse (:do parsed))
              (recur ~@(cond
                         (:collect parsed) `((if ~(:collect-if parsed) (cons ~(:collect parsed) ~collected) ~collected))
-                        (:sum parsed) `((+ ~collected ~(:sum parsed)))
+                        (:accum parsed) (let [[value combine _] (:accum parsed)]
+                                             `((~combine ~collected ~value)))
                         true `())
                     ~@(map :then loopvars))))))))
 
@@ -126,4 +134,9 @@ to result of calling TRANSFORM on the respective key/value pair."
   (is (= (iter (for x from 0 to 10)
                (sum x if (even? x)))
          30))
+  (is (= (iter (repeat 4) (multiply 3))
+         81))
+  (is (= (iter (for x from 1 to 10)
+               (multiply x if (even? x)))
+         (* 2 4 6 8 10)))
   (is (nil? (iter (for x in [1 2 3]) (do)))))

@@ -15,7 +15,7 @@ iterate.  Instead, the design goal was to keep it as simple as
 possible, and make it blend well with the rest of Clojure.  In
 contrast to [cl-loop] [2] (a similar library inspired by Common Lisp's
 standard LOOP macro), which uses mutable bindings, clj-iter has a
-functional flavour, and macroexpand to the kind of code you would
+functional flavour, and macroexpands to the kind of code you would
 write manually using loop/recur.
 
 Examples
@@ -43,13 +43,20 @@ And here is the macroexpansion:
 
 The following function takes a number (size) and a collection, 
 and transforms each element into a list containing itself and
-neighbouring elements, i.e, the distance of which from the
+neighbouring elements, i.e., the distance of which from the
 element in question is not greater than size:
 
     (defn sliding-window [coll size]
       (iter (for s on coll)
             (for q initially () then (cons (first s) q))
             (collect (cons (first s) (concat (take size (rest s)) (take size q))))))
+
+This is a neat (and extremely readable) example of raising to a
+positive integer power (yes, I know there's clojure.contrib.math,
+but just for the sake of example...):
+
+    (defn pow [x y]
+      (iter (repeat y) (multiply x)))
 
 Differences from Iterate
 ========================
@@ -61,8 +68,10 @@ Differences from Iterate
         FOR var IN sequence
         FOR var ON sequence
         FOR var INITIALLY initial-expr THEN then-expr [STOP stop-condition]
+        REPEAT number-of-times
         COLLECT expr [IF condition]
         SUM expr [IF condition]
+        MULTIPLY expr [IF condition]
 
    The symbols that are treated specially by clj-iter are spelled
    here in uppercase to distinguish them visually, but they should
@@ -82,7 +91,7 @@ Differences from Iterate
    of the ITER macro should consist of either clj-iter clauses, or
    forms to be evaluated (and results discarded) on each iteration;
    these forms cannot contain clj-iter clauses.  This means that the
-   COLLECT clause has an optional conditional IF condition; e.g., to
+   COLLECT clause has an optional conditional IF subclause; e.g., to
    collect all the even numbers of a series, you should write
 
         (iter (for x from 0 to 9)

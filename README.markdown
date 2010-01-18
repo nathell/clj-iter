@@ -63,8 +63,8 @@ Differences from Iterate
 
  * clj-iter supports only the following clauses:
 
-        FOR var FROM starting-value [TO ending-value] [BY step-value]
-        FOR var DOWNFROM starting-value [TO ending-value] [BY step-value]
+        FOR var FROM starting-value [TO/BELOW ending-value] [BY step-value]
+        FOR var DOWNFROM starting-value [TO/BELOW ending-value] [BY step-value]
         FOR var IN sequence
         FOR var ON sequence
         FOR var INITIALLY initial-expr THEN then-expr [STOP stop-condition]

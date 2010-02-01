@@ -59,6 +59,8 @@ to result of calling TRANSFORM on the respective key/value pair."
     (update-map state :vars (cons {:var var, :initially initially, :then then, :stop stop} vars))
     (:for var :initially initially :then then)
     (update-map state :vars (cons {:var var, :initially initially, :then then} vars))
+    (:stop-if condition)
+    (update-map state :stop (cons condition stop))
     (:repeat times)
     (let [v (gensym)]
       (update-map state :vars (cons {:var v, :initially 0, :then `(inc ~v), :stop `(= ~v ~times)} vars)))
@@ -93,7 +95,7 @@ to result of calling TRANSFORM on the respective key/value pair."
                 true `())
             ~@(reduce concat (map #(list (:var %) (:initially %)) loopvars))]
        (let [~@(reduce concat (map (fn [[k v]] (list k `(first ~v))) collvar-names))]
-         (if (or ~@(remove not (map :stop loopvars)))
+         (if (or ~@(remove not (concat (map :stop loopvars) (:stop parsed))))
            ~(cond
               (:collect parsed) `(reverse ~collected)
               (:accum parsed) collected)

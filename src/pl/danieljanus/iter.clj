@@ -59,6 +59,8 @@ to result of calling TRANSFORM on the respective key/value pair."
     (update-map state :vars (cons {:var var, :initially initially, :then then, :stop stop} vars))
     (:for var :initially initially :then then)
     (update-map state :vars (cons {:var var, :initially initially, :then then} vars))
+    (:for var := expr)
+    (update-map state :letvars (cons [var expr] letvars))
     (:stop-if condition)
     (update-map state :stop (cons condition stop))
     (:repeat times)
@@ -80,7 +82,7 @@ to result of calling TRANSFORM on the respective key/value pair."
     (update-map state :do (cons clause do))))
 
 (defmacro iter [& clauses]
-  (let [parsed (reduce parse-clause {:vars [], :colls [], :do []} clauses)
+  (let [parsed (reduce parse-clause {:vars [], :letvars [], :colls [], :do []} clauses)
         collvar-names (mapmap (map #(vector % (gensym)) (map :var (:colls parsed))))
         collvars (map (fn [x] {:var (collvar-names (:var x))
                                :initially (:coll x)
@@ -94,7 +96,10 @@ to result of calling TRANSFORM on the respective key/value pair."
                 (:accum parsed) `(~collected ~(nth (:accum parsed) 2))
                 true `())
             ~@(reduce concat (map #(list (:var %) (:initially %)) loopvars))]
-       (let [~@(reduce concat (map (fn [[k v]] (list k `(first ~v))) collvar-names))]
+       (let [~@(reduce concat
+                       (concat
+                        (map (fn [[k v]] (list k `(first ~v))) collvar-names)
+                        (:letvars parsed)))]
          (if (or ~@(remove not (concat (map :stop loopvars) (:stop parsed))))
            ~(cond
               (:collect parsed) `(reverse ~collected)
@@ -148,6 +153,10 @@ to result of calling TRANSFORM on the respective key/value pair."
   (is (= (iter (for x from 1 to 10)
                (multiply x if (even? x)))
          (* 2 4 6 8 10)))
+  (is (= (iter (for x from 1 to 5)
+               (for y = (inc x))
+               (collect (+ x y)))
+         (seq [3 5 7 9 11])))
   (is (= (iter (for x from 1 to 5)
                (for y in [1 2 3])
                (collect [x y]))

@@ -68,6 +68,7 @@ Differences from Iterate
         FOR var IN sequence
         FOR var ON sequence
         FOR var INITIALLY initial-expr THEN then-expr [STOP stop-condition]
+        FOR var = expr
         REPEAT number-of-times
         COLLECT expr [IF condition]
         SUM expr [IF condition]

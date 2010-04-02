@@ -15,9 +15,13 @@ to result of calling TRANSFORM on the respective key/value pair."
                   (next kvs)))
          map))))
 
-(defmacro update-map [map key val]
-  `(let [~(symbol (name key)) (~map ~key)]
-     (assoc ~map ~key ~val)))
+(defmacro update-map 
+  ([map] map)
+  ([map key val]
+     `(let [~(symbol (name key)) (~map ~key)]
+        (assoc ~map ~key ~val)))
+  ([map key val & kvs]
+     `(update-map (update-map ~map ~key ~val) ~@kvs)))
 
 (defn- parse-destructuring-cond-clause [coll [pattern value]]
   (let [numbered-entries (map vector pattern (iterate inc 0))
@@ -67,9 +71,9 @@ to result of calling TRANSFORM on the respective key/value pair."
     (let [v (gensym)]
       (update-map state :vars (cons {:var v, :initially 0, :then `(inc ~v), :stop `(= ~v ~times)} vars)))
     (:collect value :if condition)
-    (update-map (update-map state :collect value) :collect-if condition)
+    (update-map state :collect value :collect-if condition)
     (:collect value)
-    (update-map (update-map state :collect value) :collect-if 'true)
+    (update-map state :collect value :collect-if 'true)
     (:sum value :if condition)
     (update-map state :accum [`(if ~condition ~value 0) '+ 0])
     (:sum value)
@@ -78,11 +82,13 @@ to result of calling TRANSFORM on the respective key/value pair."
     (update-map state :accum [`(if ~condition ~value 1) '* 1])
     (:multiply value)
     (update-map state :accum [value '* 1])
+    (:return value :if condition)
+    (update-map state :returns (cons [condition value] returns))
     ()
     (update-map state :do (cons clause do))))
 
 (defmacro iter [& clauses]
-  (let [parsed (reduce parse-clause {:vars [], :letvars [], :colls [], :do []} clauses)
+  (let [parsed (reduce parse-clause {:vars [], :letvars [], :colls [], :returns [], :do []} clauses)
         collvar-names (mapmap (map #(vector % (gensym)) (map :var (:colls parsed))))
         collvars (map (fn [x] {:var (collvar-names (:var x))
                                :initially (:coll x)
@@ -100,18 +106,19 @@ to result of calling TRANSFORM on the respective key/value pair."
                        (concat
                         (map (fn [[k v]] (list k `(first ~v))) collvar-names)
                         (:letvars parsed)))]
-         (if (or ~@(remove not (concat (map :stop loopvars) (:stop parsed))))
-           ~(cond
-              (:collect parsed) `(reverse ~collected)
-              (:accum parsed) collected)
-           (do
-             ~@(reverse (:do parsed))
-             (recur ~@(cond
-                        (:collect parsed) `((if ~(:collect-if parsed) (cons ~(:collect parsed) ~collected) ~collected))
-                        (:accum parsed) (let [[value combine _] (:accum parsed)]
-                                             `((~combine ~collected ~value)))
-                        true `())
-                    ~@(map :then loopvars))))))))
+         (cond ~@(apply concat (:returns parsed)) true
+               (if (or ~@(remove not (concat (map :stop loopvars) (:stop parsed))))
+                 ~(cond
+                    (:collect parsed) `(reverse ~collected)
+                    (:accum parsed) collected)
+                 (do
+                   ~@(reverse (:do parsed))
+                   (recur ~@(cond
+                              (:collect parsed) `((if ~(:collect-if parsed) (cons ~(:collect parsed) ~collected) ~collected))
+                              (:accum parsed) (let [[value combine _] (:accum parsed)]
+                                                `((~combine ~collected ~value)))
+                              true `())
+                          ~@(map :then loopvars)))))))))
 
 (deftest test-iter
   (is (= (iter (for x from 1)
@@ -150,6 +157,9 @@ to result of calling TRANSFORM on the respective key/value pair."
          20))
   (is (= (iter (repeat 4) (multiply 3))
          81))
+  (is (= (iter (for x from 0 to 10) 
+               (return (inc x) if (= x 4)))
+         5))
   (is (= (iter (for x from 1 to 10)
                (multiply x if (even? x)))
          (* 2 4 6 8 10)))

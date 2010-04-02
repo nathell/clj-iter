@@ -70,6 +70,7 @@ Differences from Iterate
         FOR var INITIALLY initial-expr THEN then-expr [STOP stop-condition]
         FOR var = expr
         REPEAT number-of-times
+        RETURN expr IF condition
         COLLECT expr [IF condition]
         SUM expr [IF condition]
         MULTIPLY expr [IF condition]

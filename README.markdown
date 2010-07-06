@@ -74,6 +74,7 @@ Differences from Iterate
         COLLECT expr [IF condition]
         SUM expr [IF condition]
         MULTIPLY expr [IF condition]
+        REDUCE expr fn [IF condition]
 
    The symbols that are treated specially by clj-iter are spelled
    here in uppercase to distinguish them visually, but they should

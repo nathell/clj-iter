@@ -78,6 +78,10 @@ to result of calling TRANSFORM on the respective key/value pair."
     (update-map state :accum [`(if ~condition ~value 0) '+ 0])
     (:sum value)
     (update-map state :accum [value '+ 0])
+    (:reduce value f :if condition)
+    (update-map state :reduce [value f condition])
+    (:reduce value f)
+    (update-map state :reduce [value f true])
     (:multiply value :if condition)
     (update-map state :accum [`(if ~condition ~value 1) '* 1])
     (:multiply value)
@@ -86,6 +90,8 @@ to result of calling TRANSFORM on the respective key/value pair."
     (update-map state :returns (cons [condition value] returns))
     ()
     (update-map state :do (cons clause do))))
+
+(defonce *empty-marker* (Object.))
 
 (defmacro iter [& clauses]
   (let [parsed (reduce parse-clause {:vars [], :letvars [], :colls [], :returns [], :do []} clauses)
@@ -100,6 +106,7 @@ to result of calling TRANSFORM on the respective key/value pair."
     `(loop [~@(cond
                 (:collect parsed) `(~collected nil)
                 (:accum parsed) `(~collected ~(nth (:accum parsed) 2))
+                (:reduce parsed) `(~collected *empty-marker*)
                 true `())
             ~@(reduce concat (map #(list (:var %) (:initially %)) loopvars))]
        (let [~@(reduce concat
@@ -110,13 +117,22 @@ to result of calling TRANSFORM on the respective key/value pair."
                (if (or ~@(remove not (concat (map :stop loopvars) (:stop parsed))))
                  ~(cond
                     (:collect parsed) `(reverse ~collected)
-                    (:accum parsed) collected)
+                    (:accum parsed) collected
+                    (:reduce parsed) `(if (= ~collected *empty-marker*)
+                                        (~(second (:reduce parsed)))
+                                        ~collected))
                  (do
                    ~@(reverse (:do parsed))
                    (recur ~@(cond
                               (:collect parsed) `((if ~(:collect-if parsed) (cons ~(:collect parsed) ~collected) ~collected))
                               (:accum parsed) (let [[value combine _] (:accum parsed)]
                                                 `((~combine ~collected ~value)))
+                              (:reduce parsed) (let [[value f condition] (:reduce parsed)]
+                                                 (if (= condition true)
+                                                   `((if (= ~collected *empty-marker*) ~value (~f ~collected ~value)))
+                                                   `((if ~condition
+                                                     (if (= ~collected *empty-marker*) ~value (~f ~collected ~value))
+                                                     ~collected))))
                               true `())
                           ~@(map :then loopvars)))))))))
 
@@ -171,4 +187,14 @@ to result of calling TRANSFORM on the respective key/value pair."
                (for y in [1 2 3])
                (collect [x y]))
          (seq [[1 1] [2 2] [3 3]])))
-  (is (nil? (iter (for x in [1 2 3]) (do)))))
+  (is (nil? (iter (for x in [1 2 3]) (do))))
+  (is (= (iter (for x from 1 to 5)
+               (reduce x min))
+         1))
+  (is (= (iter (for x from 1 to 5)
+               (reduce x max))
+         5))
+  ;; check reduce empty sequence case
+  (is (= (iter (for x from 1 to 0)
+               (reduce x (fn ([& x] :some) ([] :none))))
+         :none)))

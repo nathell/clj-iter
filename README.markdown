@@ -72,6 +72,7 @@ Differences from Iterate
         REPEAT number-of-times
         RETURN expr IF condition
         COLLECT expr [IF condition]
+        FINALLY-COLLECT expr
         SUM expr [IF condition]
         MULTIPLY expr [IF condition]
         REDUCE expr fn [IF condition]

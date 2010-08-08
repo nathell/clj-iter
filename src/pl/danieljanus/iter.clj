@@ -74,6 +74,8 @@ to result of calling TRANSFORM on the respective key/value pair."
     (update-map state :collect value :collect-if condition)
     (:collect value)
     (update-map state :collect value :collect-if 'true)
+    (:finally-collect value)
+    (update-map state :finally-collect value)
     (:sum value :if condition)
     (update-map state :accum [`(if ~condition ~value 0) '+ 0])
     (:sum value)
@@ -116,7 +118,9 @@ to result of calling TRANSFORM on the respective key/value pair."
          (cond ~@(apply concat (:returns parsed)) true
                (if (or ~@(remove not (concat (map :stop loopvars) (:stop parsed))))
                  ~(cond
-                    (:collect parsed) `(reverse ~collected)
+                    (:collect parsed) (if-let [fc (:finally-collect parsed)]
+                                        `(reverse (cons ~fc ~collected))
+                                        `(reverse ~collected))
                     (:accum parsed) collected
                     (:reduce parsed) `(if (= ~collected *empty-marker*)
                                         (~(second (:reduce parsed)))
@@ -197,4 +201,8 @@ to result of calling TRANSFORM on the respective key/value pair."
   ;; check reduce empty sequence case
   (is (= (iter (for x from 1 to 0)
                (reduce x (fn ([& x] :some) ([] :none))))
-         :none)))
+         :none))
+  (is (= (iter (for x in [:foo :bar])
+               (collect x)
+               (finally-collect :baz))
+         [:foo :bar :baz])))
